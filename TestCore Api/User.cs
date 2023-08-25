@@ -14,5 +14,13 @@ namespace TestCore_Api
 
         [Required]
         public byte[] passwordSalt { get; set; }
+
+        [Required]
+        public int roleId { get; set; } =2; //defoult all users set role customer (2)
+
+        public string RefreshToken { get; set; } = string.Empty;    
+
+        public DateTime TokenCreated { get; set; }
+        public DateTime TokenExpires { get; set; }
     }
 }

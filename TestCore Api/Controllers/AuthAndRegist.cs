@@ -21,13 +21,13 @@ namespace TestCore_Api.Controllers
         private readonly IConfiguration config;
         private readonly IUserServices _userServices;
 
-        public AuthAndRegist(IConfiguration configuration,IUserServices userServices)
+        public AuthAndRegist(IConfiguration configuration, IUserServices userServices)
         {
             this.config = configuration;
             this._userServices = userServices;
         }
 
-        [HttpGet,Authorize]
+        [HttpGet, Authorize]
         public ActionResult<object> GetMe()
         {
             var userName = _userServices.GetMyName();
@@ -69,7 +69,7 @@ namespace TestCore_Api.Controllers
                     return Content(ex.Message);
                 }
 
-                
+
             }
 
 
@@ -104,7 +104,9 @@ namespace TestCore_Api.Controllers
                         return BadRequest("Wrong password");
                     }
 
-                    string token = CreateToke(tempUser);
+                    string token = CreateToken(tempUser);
+                    var refreshToken = GenerateRefreshToken();
+                    SetRefreshToken(refreshToken, tempUser);
                     return Ok(token);
 
                 }
@@ -112,9 +114,65 @@ namespace TestCore_Api.Controllers
                 {
                     return Content(ex.Message);
                 }
-                
+
+            }
+
+        }
+
+        [HttpPost("refresh-token")]
+        public async Task<ActionResult<string>> RefreshToken( string NameUser)
+        {
+            var refreshToken = Request.Cookies["refToken"];
+            using (var db = new ApplicContext())
+            {
+                User tempUser = db.Users.Where(c => c.UserName == NameUser).FirstOrDefault();
+
+                if (!tempUser.RefreshToken.Equals(refreshToken))
+                {
+                    return Unauthorized("Invalid Refresh Token");
+                }else if( tempUser.TokenExpires < DateTime.Now)
+                {
+                    return Unauthorized("Token expired");
+                }
+
+                string token = CreateToken(tempUser);
+                var newRefreshToken = GenerateRefreshToken();
+                SetRefreshToken(newRefreshToken, tempUser);
+                return Ok(token);
             }
                 
+            
+        }
+
+        private RefreshToken GenerateRefreshToken()
+        {
+            var refToken = new RefreshToken()
+            {
+                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                Expires = DateTime.Now.AddDays(7),
+                Created = DateTime.Now
+            };
+            return refToken;
+        }
+        private void SetRefreshToken(RefreshToken newRefreshToken,User user)
+        {
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Expires = newRefreshToken.Expires
+            };
+            Response.Cookies.Append("refToken", newRefreshToken.Token, cookieOptions);
+
+            using (var db = new ApplicContext()) {
+                User tempUser = db.Users.Where(c => c.UserId == user.UserId).FirstOrDefault();
+                tempUser.RefreshToken = newRefreshToken.Token;
+                tempUser.TokenCreated = newRefreshToken.Created;
+                tempUser.TokenExpires = newRefreshToken.Expires;
+
+                
+                db.SaveChanges();
+            }
+
         }
 
 
@@ -128,12 +186,18 @@ namespace TestCore_Api.Controllers
         }
 
 
-        private string CreateToke(User user)
+        private string CreateToken(User user)
         {
-            List<Claim> claims = new List<Claim>
+            string nameRole = null;
+            using (var db = new ApplicContext()) 
+            {
+                var roleTx = db.Roles.Where(c => c.IdRole == user.roleId).FirstOrDefault();
+                nameRole = roleTx.NameRole;
+            }
+                List<Claim> claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name,user.UserName),
-                new Claim(ClaimTypes.Role,"Admin")
+                new Claim(ClaimTypes.Role,nameRole)
             };
 
             var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(config.GetSection("AppSet:Token").Value));
