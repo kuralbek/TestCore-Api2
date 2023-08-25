@@ -134,7 +134,7 @@ namespace TestCore_Api.Controllers
                 {
                     return Unauthorized("Token expired");
                 }
-
+                
                 string token = CreateToken(tempUser);
                 var newRefreshToken = GenerateRefreshToken();
                 SetRefreshToken(newRefreshToken, tempUser);
