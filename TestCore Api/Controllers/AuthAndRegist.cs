@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Cors;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
@@ -18,10 +19,24 @@ namespace TestCore_Api.Controllers
     {
         //public static User user= new User();
         private readonly IConfiguration config;
+        private readonly IUserServices _userServices;
 
-        public AuthAndRegist(IConfiguration configuration)
+        public AuthAndRegist(IConfiguration configuration,IUserServices userServices)
         {
             this.config = configuration;
+            this._userServices = userServices;
+        }
+
+        [HttpGet,Authorize]
+        public ActionResult<object> GetMe()
+        {
+            var userName = _userServices.GetMyName();
+            return Ok(userName);
+            /*var userName = User?.Identity?.Name;
+            var userName2 = User.FindFirstValue(ClaimTypes.Name);
+            var userRole = User.FindFirstValue(ClaimTypes.Role);
+
+            return Ok(new { userName,userName2,userRole});*/
         }
 
 
